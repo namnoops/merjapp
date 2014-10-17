@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -29,9 +30,11 @@ public class Merge {
 	private static boolean DEBUG = false;
 	private static boolean SIMULATION = false;
 
+	private static final String OUTPUT_DATABASE		= "output.db";
+	private static final String TEMP_DATABASE		= "temp.db";
+	
 	BufferedWriter logFile = null;
 
-	private String newDBPath;
 	private SQLiteJDBC oldSQL;
 	private SQLiteJDBC newSQL;
 
@@ -118,7 +121,7 @@ public class Merge {
 		prepareOldDB();
 
 		// Attach new database to old
-		oldSQL.prepareStatement("ATTACH DATABASE \"" + newDBPath + "\" AS NEW").execute();
+		oldSQL.prepareStatement("ATTACH DATABASE \"" + TEMP_DATABASE + "\" AS NEW").execute();
 
 		// Copy all messages from old database to new
 		copyMessages();
@@ -338,16 +341,29 @@ public class Merge {
 
 	private Merge(String oldDBPath, String newDBPath) {
 
-		if (!new File(oldDBPath).exists()) {
+		File oldDBFile = new File(oldDBPath);
+		File newDBFile = new File(newDBPath);
+		
+		if (!oldDBFile.exists()) {
 			System.err.println("-E- Database " + oldDBPath + " cannot be found!");
 			System.exit(1);
 		}
 
-		if (!new File(newDBPath).exists()) {
+		if (!newDBFile.exists()) {
 			System.err.println("-E- Database " + newDBPath + " cannot be found!");
 			System.exit(1);
 		}
 
+		// Copy the files aside
+		try {
+			Files.copy(oldDBFile.toPath(), new File(OUTPUT_DATABASE).toPath());
+			Files.copy(newDBFile.toPath(), new File(TEMP_DATABASE).toPath());
+		} catch (IOException e1) {
+			System.err.println("-E- Could not make copies of databases");
+			System.exit(1);
+		}
+		
+		
 		String logFileName = "merjapp." + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date()) + ".log";
 		try {
 			FileWriter fstream = new FileWriter(logFileName, true);
@@ -357,19 +373,21 @@ public class Merge {
 			System.exit(1);
 		}
 
-		this.newDBPath = newDBPath;
-
-		oldSQL = openDatabase(oldDBPath);
-		newSQL = openDatabase(newDBPath);
+		oldSQL = openDatabase(OUTPUT_DATABASE);
+		newSQL = openDatabase(TEMP_DATABASE);
 	}
 
-	private void closeLogFile() {
+	private void cleanFiles() {
+		// Close log file
 		try {
 			logFile.flush();
 			logFile.close();
 		} catch (IOException e) {
 			System.err.println("-E- Couldn't close log file!");
 		}
+		
+		// Remove temporary database
+		new File(TEMP_DATABASE).delete();
 	}
 
 	public static void main(String args[]) throws Exception {
@@ -394,7 +412,7 @@ public class Merge {
 
 		Merge merge = new Merge(oldDBPath, newDBPath);
 		merge.doMerge();
-		merge.closeLogFile();
+		merge.cleanFiles();
 	}
 
 }
