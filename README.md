@@ -11,3 +11,6 @@ Your output will be the old databases as the entries in the new database will be
 
 This tool is released as is and the author takes no responsibility on any data losses.
 Please use at your own risk!
+
+For more information go to the application thread on XDA developers:
+http://forum.xda-developers.com/android/apps-games/tool-merjapp-merge-whatsapp-databases-t2896496
