@@ -60,7 +60,9 @@ public class SQLiteJDBC {
 //			s.setQueryTimeout();
 			s.execute(sqlStatement);
 			s.close();
-		} catch (SQLException e) {}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	   /**

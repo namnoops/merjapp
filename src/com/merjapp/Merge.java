@@ -18,10 +18,10 @@ public class Merge {
 	private static final SimpleDateFormat LOG_DATE_FORMAT			= new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	
 	private static final String[] CHAT_LIST_INSERT_FIELDS_GROUP		= new String[] {"key_remote_jid", "message_table_id", "subject", "creation",
-			"last_read_mesage_table_id", "last_read_receipt_sent_message_table_id", "archived", "sort_timestamp" };
+			"last_read_message_table_id", "last_read_receipt_sent_message_table_id", "archived", "sort_timestamp" };
 	
 	private static final String[] CHAT_LIST_INSERT_FIELDS_CONTACT	= new String[] {"key_remote_jid", "message_table_id", "subject",
-		"last_read_mesage_table_id", "last_read_receipt_sent_message_table_id", "archived", "sort_timestamp" };
+		"last_read_message_table_id", "last_read_receipt_sent_message_table_id", "archived", "sort_timestamp" };
 		
 	private static final String[] CHAT_LIST_UPDATE_FIELDS			= new String[] {"message_table_id",	"last_read_mesage_table_id",
 		"last_read_receipt_sent_message_table_id", "archived", "sort_timestamp"};
@@ -199,27 +199,30 @@ public class Merge {
 		executeUpdate(newSQL, "DELETE FROM messages" + " WHERE _id = 1");
 
 		// Find the ID of the first message in the new database
-		rs = newSQL.executeQuery("SELECT MIN(_id) FROM messages");
+		rs = newSQL.executeQuery("SELECT MIN(_id), MAX(_id) FROM messages");
 		int newMinID = rs.getInt("MIN(_id)");
+		int newMaxID = rs.getInt("MAX(_id)");
 		rs.close();
 
 		int msgOffset = oldMaxID + 1 - newMinID;
 
 		if (DEBUG) {
 			printToLog("Last message ID in old database is " + oldMaxID, "DEBUG");
-			printToLog("First message ID in new database is " + newMinID, "DEBUG");
+			printToLog("First, Last message ID in new database is " + newMinID + ", " + newMaxID, "DEBUG");
 			printToLog("Message offset is " + msgOffset, "DEBUG");
 		}
 
 		// Increase the _id in messages by offset, and also the message_table_id
 		// field in chat_list, which refers to message numbers.
 		printToLog("Updating message IDs in new database with offset from old database");
-		executeUpdate(newSQL, "UPDATE messages SET _id = _id + " + msgOffset);
+		executeUpdate(newSQL, "UPDATE messages SET _id = _id + " + (oldMaxID + newMaxID));
+		executeUpdate(newSQL, "UPDATE messages SET _id = _id - " + (oldMaxID + newMaxID - msgOffset));
+		
 		executeUpdate(newSQL, "UPDATE chat_list SET message_table_id = message_table_id + " + msgOffset);
 
 		// These two fields are only there in versions from around August 20th, 2014
 		try {
-			executeUpdate(newSQL, "UPDATE chat_list SET last_read_messages_table_id = last_read_messages_table_id + " + msgOffset);
+			executeUpdate(newSQL, "UPDATE chat_list SET last_read_message_table_id = last_read_message_table_id + " + msgOffset);
 			executeUpdate(newSQL, "UPDATE chat_list SET last_read_receipt_sent_message_table_id = last_read_receipt_sent_message_table_id + " + msgOffset);
 		} catch (Exception e) {}
 
@@ -363,7 +366,6 @@ public class Merge {
 			System.exit(1);
 		}
 		
-		
 		String logFileName = "merjapp." + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date()) + ".log";
 		try {
 			FileWriter fstream = new FileWriter(logFileName, true);
@@ -385,6 +387,10 @@ public class Merge {
 		} catch (IOException e) {
 			System.err.println("-E- Couldn't close log file!");
 		}
+		
+		// Close SQL connections
+		oldSQL.disconnect();
+		newSQL.disconnect();
 		
 		// Remove temporary database
 		new File(TEMP_DATABASE).delete();
