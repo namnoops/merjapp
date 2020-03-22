@@ -100,7 +100,7 @@ public class Merge {
 
 			fieldList.add(fieldNames[i]);
 			if (fieldValues[i] instanceof String)
-				valueList.add("'" + fieldValues[i] + "'");
+				valueList.add(String.format("'%s'", fieldValues[i].toString().replace("'", "''")));
 			else
 				valueList.add(fieldValues[i].toString());
 		}
